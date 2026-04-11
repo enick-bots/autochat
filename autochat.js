@@ -13,106 +13,103 @@ const botsConfig = [
 const clientes = [];
 const frasesApoyo = ["revisa md pa", "ve el md", "checa md", "te mandé md bro"];
 
-function gestionarDescanso() {
-  const listos = clientes.filter(c => !c.estaDurmiendo && !c.bloqueadoPorChat && c.contadorMensajes >= 2);
-  if (listos.length >= 2) {
-    const seleccionados = listos.sort(() => 0.5 - Math.random()).slice(0, 2);
-    seleccionados.forEach(c => {
-      c.estaDurmiendo = true;
-      setTimeout(() => {
-        c.estaDurmiendo = false;
-        c.contadorMensajes = 0;
-        c.ejecutarBucle();
-      }, 240000);
-    });
-  }
-}
-
-botsConfig.forEach((conf, index) => {
-  if (!conf.token) {
-    console.log(`⚠️ Falta el TOKEN_${index + 1} en el .env`);
-    return;
-  }
-
+botsConfig.forEach((conf) => {
+  if (!conf.token) return;
   const client = new Client({ checkUpdate: false });
+  
   client.conf = conf;
   client.bloqueadoPorChat = false;
-  client.contadorMensajes = 0;
   client.estaDurmiendo = false;
+  client.estaFuera = false;
+  client.buclesCompletados = 0;
+  client.metaBucle = Math.floor(Math.random() * (12 - 6 + 1) + 6);
+  
+  client.horaDormir = 22 + Math.random() * 1.8; 
+  client.horaDespertar = 7 + Math.random() * 2.8;
 
   client.on('error', () => {}); 
 
   client.ejecutarBucle = async function() {
-    if (this.bloqueadoPorChat || this.estaDurmiendo) return;
+    if (this.bloqueadoPorChat || this.estaDurmiendo || this.estaFuera) return;
+
+    const horaActual = new Date().getHours() + new Date().getMinutes() / 60;
+    const esDeNoche = this.horaDormir > this.horaDespertar 
+      ? (horaActual >= this.horaDormir || horaActual < this.horaDespertar)
+      : (horaActual >= this.horaDormir && horaActual < this.horaDespertar);
+
+    if (esDeNoche) {
+      this.estaFuera = false; 
+      return setTimeout(() => this.ejecutarBucle(), 1800000);
+    }
+
+    if (Math.random() < 0.15 && this.buclesCompletados === 0 && !this.estaFuera) {
+      this.estaFuera = true;
+      const tiempoFuera = Math.floor(Math.random() * (300 - 120 + 1) + 120) * 60000; 
+      console.log(`[${this.user.username}] Ocupado fuera de Discord (vuelvo en ${tiempoFuera/60000} min)`);
+      return setTimeout(() => { this.estaFuera = false; this.ejecutarBucle(); }, tiempoFuera);
+    }
+
+    if (this.buclesCompletados >= this.metaBucle) {
+      this.buclesCompletados = 0;
+      this.metaBucle = Math.floor(Math.random() * (11 - 7 + 1) + 7);
+      const descansoLargo = Math.floor(Math.random() * (60 - 25 + 1) + 25) * 60000;
+      return setTimeout(() => this.ejecutarBucle(), descansoLargo);
+    }
+
     try {
-      for (const id of CANALES) {
+      const canalesMezclados = [...CANALES].sort(() => 0.5 - Math.random());
+      for (const id of canalesMezclados) {
+        if (Math.random() < 0.1) continue; 
         const canal = await this.channels.fetch(id).catch(() => null);
         if (!canal) continue;
-        const miFrase = this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)];
+
         await canal.sendTyping();
-        await new Promise(r => setTimeout(r, Math.random() * 3000 + 2000));
-        await canal.send({ content: miFrase, files: this.conf.fotos });
-        if (CANALES.indexOf(id) === 0) await new Promise(r => setTimeout(r, 60000));
+        await new Promise(r => setTimeout(r, Math.random() * 6000 + 4000));
+        await canal.send({ content: this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)], files: this.conf.fotos });
+        
+        await new Promise(r => setTimeout(r, Math.floor(Math.random() * 120000 + 45000)));
       }
-      this.contadorMensajes++;
-      if (this.contadorMensajes >= 2) {
-        gestionarDescanso();
-      } else {
-        const esperaMin = Math.floor(Math.random() * (7 - 4 + 1) + 4);
-        setTimeout(() => this.ejecutarBucle(), esperaMin * 60000);
-      }
-    } catch (e) {
-      setTimeout(() => this.ejecutarBucle(), 60000);
-    }
+
+      this.buclesCompletados++;
+      setTimeout(() => this.ejecutarBucle(), Math.floor(Math.random() * 8 + 4) * 60000);
+    } catch (e) { setTimeout(() => this.ejecutarBucle(), 60000); }
   };
 
   client.on('ready', () => {
-    console.log(`🚀 Listo: ${client.user.tag}`);
+    console.log(`🚀 ${client.user.tag} activo.`);
     clientes.push(client);
-    setTimeout(() => client.ejecutarBucle(), Math.random() * 20000);
+    setTimeout(() => client.ejecutarBucle(), Math.random() * 1200000);
   });
 
   client.on('messageCreate', async (msg) => {
-    if (!CANALES.includes(msg.channel.id) || msg.author.bot) return;
+    if (!CANALES.includes(msg.channel.id) || msg.author.bot || client.estaFuera) return;
     const esDeMisBots = clientes.some(c => c.user.id === msg.author.id);
-    if (esDeMisBots && msg.author.id !== client.user.id) {
-      if (Math.random() < 0.05) { 
-        setTimeout(async () => {
-          const apoyo = frasesApoyo[Math.floor(Math.random() * frasesApoyo.length)];
-          await msg.reply(apoyo).catch(() => {});
-        }, 15000);
-      }
+
+    if (esDeMisBots && msg.author.id !== client.user.id && Math.random() < 0.05) {
+      setTimeout(async () => {
+        await msg.reply(frasesApoyo[Math.floor(Math.random() * frasesApoyo.length)]).catch(() => {});
+      }, Math.random() * 20000 + 15000);
     }
-    const meMencionan = msg.mentions.has(client.user.id);
-    let esReplyAMiConFoto = false;
-    if (msg.reference && msg.reference.messageId) {
+
+    let esReplyAMi = false;
+    if (msg.reference) {
       try {
-        const msgOriginal = msg.channel.messages.cache.get(msg.reference.messageId) || await msg.channel.messages.fetch(msg.reference.messageId);
-        if (msgOriginal && msgOriginal.author.id === client.user.id && msgOriginal.attachments.size > 0) {
-          esReplyAMiConFoto = true;
-        }
-      } catch (e) { esReplyAMiConFoto = false; }
+        const msgOriginal = await msg.channel.messages.fetch(msg.reference.messageId).catch(() => null);
+        if (msgOriginal?.author.id === client.user.id && msgOriginal.attachments.size > 0) esReplyAMi = true;
+      } catch (e) {}
     }
-    if ((meMencionan || esReplyAMiConFoto) && /\b(m+d+|d+m+)\b/i.test(msg.content)) {
+
+    if ((msg.mentions.has(client.user.id) || esReplyAMi) && /\b(m+d+|d+m+)\b/i.test(msg.content)) {
       if (client.bloqueadoPorChat || esDeMisBots) return; 
       client.bloqueadoPorChat = true;
       setTimeout(async () => {
         try {
-          const res = client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)];
-          await msg.reply(res);
-          setTimeout(() => { 
-            client.bloqueadoPorChat = false; 
-            client.ejecutarBucle(); 
-          }, 300000);
-        } catch (err) { 
-          client.bloqueadoPorChat = false; 
-          client.ejecutarBucle(); 
-        }
-      }, Math.floor(Math.random() * 20000 + 20000));
+          await msg.reply(client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)]);
+          setTimeout(() => { client.bloqueadoPorChat = false; client.ejecutarBucle(); }, 420000);
+        } catch (err) { client.bloqueadoPorChat = false; client.ejecutarBucle(); }
+      }, Math.floor(Math.random() * 25000 + 20000));
     }
   });
 
-  client.login(conf.token).catch((err) => {
-    console.log(`❌ Error login TOKEN_${index + 1}: ${err.message}`);
-  });
+  client.login(conf.token).catch(() => {});
 });
