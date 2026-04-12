@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client } = require('discord.js-selfbot-v13');
+const { Client, MessageAttachment } = require('discord.js-selfbot-v13');
 
 const CANALES = process.env.CANALES_IDS ? process.env.CANALES_IDS.split(',') : [];
 const botsConfig = [
@@ -19,9 +19,24 @@ function iniciarBot(conf) {
   client.bloqueadoPorChat = false;
   client.buclesCompletados = 0;
   client.metaBucle = Math.floor(Math.random() * 7 + 6);
+  client.horaDormir = 22 + Math.random() * 1.8; 
+  client.horaDespertar = 7 + Math.random() * 2.8;
 
   client.ejecutarBucle = async function() {
     if (this.bloqueadoPorChat) return;
+
+    const ahora = new Date().getHours() + new Date().getMinutes() / 60;
+    const nocturno = this.horaDormir > this.horaDespertar 
+      ? (ahora >= this.horaDormir || ahora < this.horaDespertar)
+      : (ahora >= this.horaDormir && ahora < this.horaDespertar);
+
+    if (nocturno) {
+      console.log(`${this.user.username} se duerme, vuelve en ${Math.floor(this.horaDespertar)} am aprox (off)`);
+      const configActual = this.conf;
+      this.destroy();
+      setTimeout(() => iniciarBot(configActual), 600000);
+      return;
+    }
 
     if (Math.random() < 0.15 && this.buclesCompletados === 0) {
       const duracionFuera = Math.floor(Math.random() * 181 + 120) * 60000; 
@@ -45,24 +60,42 @@ function iniciarBot(conf) {
       for (const id of colaCanales) {
         if (Math.random() < 0.1) continue; 
         const canal = await this.channels.fetch(id).catch(() => null);
-        if (!canal) continue;
+        if (!canal || !canal.isText()) continue;
+
         await canal.sendTyping();
         await new Promise(r => setTimeout(r, Math.random() * 6000 + 4000));
-        const enviado = await canal.send({ content: this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)], files: this.conf.fotos }).catch(() => null);
-        if (enviado) console.log(`mensaje mandado por ${this.user.username} en el canal ${canal.name}`);
+        
+        const attachments = this.conf.fotos.map(f => new MessageAttachment(f));
+        const enviado = await canal.send({ 
+          content: this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)], 
+          files: attachments 
+        }).catch(() => null);
+        
+        if (enviado) {
+          console.log(`mensaje mandado por ${this.user.username} en el canal ${canal.name}`);
+        } else {
+          console.log(`error: ${this.user.username} no pudo enviar el mensaje en ${canal.name}`);
+        }
+        
         const esperaEntre = Math.floor(Math.random() * 120000 + 45000);
         console.log(`el siguiente mensaje de ${this.user.username} sale en ${Math.floor(esperaEntre/1000)} segundos`);
         await new Promise(r => setTimeout(r, esperaEntre));
       }
+
       this.buclesCompletados++;
-      setTimeout(() => this.ejecutarBucle(), Math.floor(Math.random() * 5 + 4) * 60000);
-    } catch (e) { setTimeout(() => this.ejecutarBucle(), 60000); }
+      const proximoBucle = Math.floor(Math.random() * 5 + 4) * 60000;
+      setTimeout(() => this.ejecutarBucle(), proximoBucle);
+    } catch (e) { 
+      setTimeout(() => this.ejecutarBucle(), 60000); 
+    }
   };
 
   client.on('ready', () => {
     console.log(`log in exitoso: ${client.user.tag} (ID: ${client.user.id})`);
-    if (!clientes.find(c => c.user?.id === client.user.id)) clientes.push(client);
-    setTimeout(() => client.ejecutarBucle(), 5000);
+    const index = clientes.findIndex(c => c.conf.token === client.conf.token);
+    if (index !== -1) clientes[index] = client; else clientes.push(client);
+    
+    setTimeout(() => client.ejecutarBucle(), Math.random() * 1200000);
   });
 
   client.on('messageCreate', async (msg) => {
@@ -78,15 +111,18 @@ function iniciarBot(conf) {
         if (refMsg && refMsg.author.id === client.user.id) esReferencia = true;
       } catch (err) {}
     }
-    const keywordMatch = msg.content.toLowerCase().match(/\b(m+d+|d+m+)\b/i);
-    if ((msg.mentions.has(client.user.id) || esReferencia) && keywordMatch) {
+    const match = msg.content.toLowerCase().match(/\b(m+d+|d+m+)\b/i);
+    if ((msg.mentions.has(client.user.id) || esReferencia) && match) {
       if (client.bloqueadoPorChat || esPropio) return; 
       client.bloqueadoPorChat = true;
       setTimeout(async () => {
         try {
           await msg.reply(client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)]);
-          console.log(`${client.user.username} respondió al ${keywordMatch} de ${msg.author.username} en el canal ${msg.channel.name}`);
-          setTimeout(() => { client.bloqueadoPorChat = false; client.ejecutarBucle(); }, 420000);
+          console.log(`${client.user.username} respondió al ${match[0]} de ${msg.author.username} en el canal ${msg.channel.name}`);
+          setTimeout(() => { 
+            client.bloqueadoPorChat = false; 
+            client.ejecutarBucle(); 
+          }, 420000);
         } catch (err) { client.bloqueadoPorChat = false; client.ejecutarBucle(); }
       }, Math.floor(Math.random() * 25000 + 20000));
     }
@@ -94,4 +130,5 @@ function iniciarBot(conf) {
 
   client.login(conf.token).catch(() => console.log(`error en log in: token inválido`));
 }
+
 botsConfig.forEach(conf => iniciarBot(conf));
