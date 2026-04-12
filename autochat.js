@@ -1,4 +1,4 @@
-          require('dotenv').config();
+require('dotenv').config();
 const { Client } = require('discord.js-selfbot-v13');
 
 const CANALES = process.env.CANALES_IDS ? process.env.CANALES_IDS.split(',') : [];
@@ -102,8 +102,12 @@ botsConfig.forEach((conf) => {
 
     let esReferencia = false;
     if (msg.reference) {
-      const refMsg = await msg.channel.messages.fetch(msg.reference.messageId).catch(() => null);
-      if (refMsg?.author.id === client.user.id) esReferencia = true;
+      try {
+        const refMsg = await msg.channel.messages.fetch(msg.reference.messageId);
+        if (refMsg && refMsg.author.id === client.user.id) esReferencia = true;
+      } catch (err) {
+        esReferencia = false;
+      }
     }
 
     const tieneKeywords = /\b(m+d+|d+m+)\b/i.test(msg.content);
