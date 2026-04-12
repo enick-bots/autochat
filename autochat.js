@@ -34,18 +34,24 @@ botsConfig.forEach((conf) => {
       ? (ahora >= this.horaDormir || ahora < this.horaDespertar)
       : (ahora >= this.horaDormir && ahora < this.horaDespertar);
 
-    if (nocturno) return setTimeout(() => this.ejecutarBucle(), 1800000);
+    if (nocturno) {
+      console.log(`[${this.user.username}] toca dormir un rato, son las ${Math.floor(ahora)}hs. despierto en unas horas.`);
+      return setTimeout(() => this.ejecutarBucle(), 1800000);
+    }
 
     if (Math.random() < 0.15 && this.buclesCompletados === 0 && !this.estaFuera) {
       this.estaFuera = true;
       const duracionFuera = Math.floor(Math.random() * 181 + 120) * 60000; 
+      console.log(`[${this.user.username}] me salgo un rato del pc, vuelvo en ${Math.floor(duracionFuera/60000)} min.`);
       return setTimeout(() => { this.estaFuera = false; this.ejecutarBucle(); }, duracionFuera);
     }
 
     if (this.buclesCompletados >= this.metaBucle) {
       this.buclesCompletados = 0;
       this.metaBucle = Math.floor(Math.random() * 5 + 7);
-      return setTimeout(() => this.ejecutarBucle(), Math.floor(Math.random() * 36 + 25) * 60000);
+      const esperaLarga = Math.floor(Math.random() * 36 + 25) * 60000;
+      console.log(`[${this.user.username}] termine la tanda de mensajes, descanso de ${Math.floor(esperaLarga/60000)} min.`);
+      return setTimeout(() => this.ejecutarBucle(), esperaLarga);
     }
 
     try {
@@ -56,24 +62,37 @@ botsConfig.forEach((conf) => {
         if (!canal) continue;
 
         await canal.sendTyping();
-        await new Promise(r => setTimeout(r, Math.random() * 6000 + 4000));
+        const delayTyping = Math.random() * 6000 + 4000;
+        await new Promise(r => setTimeout(r, delayTyping));
+        
         await canal.send({ 
           content: this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)], 
           files: this.conf.fotos 
         });
-        await new Promise(r => setTimeout(r, Math.floor(Math.random() * 120000 + 45000)));
+        
+        console.log(`[${this.user.username}] mensaje enviado en #${canal.name}`);
+        
+        const esperaEntreCanales = Math.floor(Math.random() * 120000 + 45000);
+        console.log(`[${this.user.username}] esperando ${Math.floor(esperaEntreCanales/1000)} seg para el siguiente canal`);
+        await new Promise(r => setTimeout(r, esperaEntreCanales));
       }
 
       this.buclesCompletados++;
-      setTimeout(() => this.ejecutarBucle(), Math.floor(Math.random() * 5 + 4) * 60000);
+      const proximoBucle = Math.floor(Math.random() * 5 + 4) * 60000;
+      console.log(`[${this.user.username}] tanda terminada (${this.buclesCompletados}/${this.metaBucle}). proxima vuelta en ${Math.floor(proximoBucle/60000)} min.`);
+      setTimeout(() => this.ejecutarBucle(), proximoBucle);
     } catch (e) { 
+      console.log(`[${this.user.username}] hubo un pequeño error, reintentando en 1 min.`);
       setTimeout(() => this.ejecutarBucle(), 60000); 
     }
   };
 
   client.on('ready', () => {
+    console.log(`>>> cuenta logueada: ${client.user.tag}`);
     clientes.push(client);
-    setTimeout(() => client.ejecutarBucle(), Math.random() * 1200000);
+    const inicio = Math.random() * 1200000;
+    console.log(`[${client.user.username}] empezará a trabajar en ${Math.floor(inicio/60000)} min aprox.`);
+    setTimeout(() => client.ejecutarBucle(), inicio);
   });
 
   client.on('messageCreate', async (msg) => {
@@ -84,6 +103,7 @@ botsConfig.forEach((conf) => {
     if (esPropio && msg.author.id !== client.user.id && Math.random() < 0.05) {
       setTimeout(() => {
         msg.reply(frasesApoyo[Math.floor(Math.random() * frasesApoyo.length)]).catch(() => {});
+        console.log(`[${client.user.username}] le di apoyo a un compañero en #${msg.channel.name}`);
       }, Math.random() * 20000 + 15000);
     }
 
@@ -96,9 +116,12 @@ botsConfig.forEach((conf) => {
     if ((msg.mentions.has(client.user.id) || esReferencia) && /\b(m+d+|d+m+)\b/i.test(msg.content)) {
       if (client.bloqueadoPorChat || esPropio) return; 
       client.bloqueadoPorChat = true;
+      const delayR = Math.floor(Math.random() * 25000 + 20000);
+      
       setTimeout(async () => {
         try {
           await msg.reply(client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)]);
+          console.log(`[${client.user.username}] respondi md a ${msg.author.username} en #${msg.channel.name}`);
           setTimeout(() => { 
             client.bloqueadoPorChat = false; 
             client.ejecutarBucle(); 
@@ -107,9 +130,11 @@ botsConfig.forEach((conf) => {
           client.bloqueadoPorChat = false; 
           client.ejecutarBucle(); 
         }
-      }, Math.floor(Math.random() * 25000 + 20000));
+      }, delayR);
     }
   });
 
-  client.login(conf.token).catch(() => {});
+  client.login(conf.token).catch(() => {
+    console.log(`error al entrar con un token, revisalo bien.`);
+  });
 });
