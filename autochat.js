@@ -64,12 +64,16 @@ botsConfig.forEach((conf) => {
         await canal.sendTyping();
         await new Promise(r => setTimeout(r, Math.random() * 6000 + 4000));
         
-        await canal.send({ 
+        const enviado = await canal.send({ 
           content: this.conf.frases[Math.floor(Math.random() * this.conf.frases.length)], 
           files: this.conf.fotos 
-        });
+        }).catch(() => null);
         
-        console.log(`mensaje mandado por ${this.user.username} en el canal ${canal.name}`);
+        if (enviado) {
+          console.log(`mensaje mandado por ${this.user.username} en el canal ${canal.name}`);
+        } else {
+          console.log(`error: ${this.user.username} no pudo enviar el mensaje en ${canal.name}`);
+        }
         
         const esperaEntre = Math.floor(Math.random() * 120000 + 45000);
         console.log(`el siguiente mensaje de ${this.user.username} sale en ${Math.floor(esperaEntre/1000)} segundos`);
@@ -86,7 +90,7 @@ botsConfig.forEach((conf) => {
   client.on('ready', () => {
     console.log(`log in exitoso: ${client.user.tag} (ID: ${client.user.id})`);
     clientes.push(client);
-    setTimeout(() => client.ejecutarBucle(), Math.random() * 1200000);
+    setTimeout(() => client.ejecutarBucle(), Math.random() * 120000);
   });
 
   client.on('messageCreate', async (msg) => {
@@ -101,24 +105,22 @@ botsConfig.forEach((conf) => {
     }
 
     let esReferencia = false;
-    if (msg.reference) {
+    if (msg.reference && msg.reference.messageId) {
       try {
         const refMsg = await msg.channel.messages.fetch(msg.reference.messageId);
         if (refMsg && refMsg.author.id === client.user.id) esReferencia = true;
-      } catch (err) {
-        esReferencia = false;
-      }
+      } catch (err) {}
     }
 
-    const keyword = msg.content.toLowerCase().match(/\b(m+d+|d+m+)\b/i);
-    if ((msg.mentions.has(client.user.id) || esReferencia) && keyword) {
+    const keywordMatch = msg.content.toLowerCase().match(/\b(m+d+|d+m+)\b/i);
+    if ((msg.mentions.has(client.user.id) || esReferencia) && keywordMatch) {
       if (client.bloqueadoPorChat || esPropio) return; 
       client.bloqueadoPorChat = true;
       
       setTimeout(async () => {
         try {
           await msg.reply(client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)]);
-          console.log(`${client.user.username} respondió al ${keyword[0]} de ${msg.author.username} en el canal ${msg.channel.name}`);
+          console.log(`${client.user.username} respondió al ${keywordMatch[0]} de ${msg.author.username} en el canal ${msg.channel.name}`);
           setTimeout(() => { 
             client.bloqueadoPorChat = false; 
             client.ejecutarBucle(); 
