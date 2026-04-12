@@ -110,17 +110,15 @@ botsConfig.forEach((conf) => {
       }
     }
 
-    const tieneKeywords = /\b(m+d+|d+m+)\b/i.test(msg.content);
-    if ((msg.mentions.has(client.user.id) || esReferencia) && tieneKeywords) {
+    const keyword = msg.content.toLowerCase().match(/\b(m+d+|d+m+)\b/i);
+    if ((msg.mentions.has(client.user.id) || esReferencia) && keyword) {
       if (client.bloqueadoPorChat || esPropio) return; 
       client.bloqueadoPorChat = true;
       
-      const tipoMensaje = msg.content.toLowerCase().includes('md') ? 'md' : 'dm';
-
       setTimeout(async () => {
         try {
           await msg.reply(client.conf.respuestas[Math.floor(Math.random() * client.conf.respuestas.length)]);
-          console.log(`${client.user.username} respondió al ${tipoMensaje} de ${msg.author.username} en el canal ${msg.channel.name}`);
+          console.log(`${client.user.username} respondió al ${keyword[0]} de ${msg.author.username} en el canal ${msg.channel.name}`);
           setTimeout(() => { 
             client.bloqueadoPorChat = false; 
             client.ejecutarBucle(); 
