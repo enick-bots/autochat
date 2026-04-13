@@ -2,7 +2,12 @@ require('dotenv').config();
 const http = require('http');
 const { Client } = require('discord.js-selfbot-v13');
 
-http.createServer((req, res) => { res.writeHead(200); res.end('Stable'); }).listen(5000);
+const PORT = process.env.PORT || 5000;
+
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Stable');
+}).listen(PORT, () => console.log(`Uptime activo en puerto ${PORT}`));
 
 const CANALES_IDS = process.env.CANALES_IDS ? process.env.CANALES_IDS.split(',') : [];
 
