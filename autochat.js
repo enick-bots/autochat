@@ -46,7 +46,7 @@ const login = async () => {
   if (isLoggingIn) return;
   
   if (estaEnHorarioDeSueño()) {
-    log(`En horario de sueño (${horaDormir}h - ${horaDespertar}h).`);
+    log(`OFF - HORARIO DE SUEÑO (${horaDormir}h - ${horaDespertar}h)`);
     return setTimeout(login, 1800000); 
   }
 
@@ -56,7 +56,9 @@ const login = async () => {
   client.on('ready', () => {
     isLoggingIn = false;
     botActivo = true;
-    log(`Conectado como ${client.user.username}`);
+    console.log('-------------------------');
+    console.log(`BOT ON: ${client.user.username}`);
+    console.log('-------------------------');
     ejecutarBucle();
   });
 
@@ -72,12 +74,12 @@ const ejecutarBucle = async () => {
   if (!botActivo || !client?.user) return;
 
   if (estaEnHorarioDeSueño()) {
-    log("Hora de dormir alcanzada.");
+    log("OFF - INICIANDO SUEÑO");
     return limpiarYReconectar(3600000);
   }
 
   try {
-    const canales = [...CANALES_IDS].sort(() => Math.random() - 0.5);
+    const canales = [...CANALES_IDS];
     
     for (const id of canales) {
       if (!botActivo) return;
@@ -92,25 +94,24 @@ const ejecutarBucle = async () => {
       }
 
       await canal.sendTyping().catch(() => {});
-      await new Promise(r => setTimeout(r, Math.random() * 5000 + 4000));
+      await new Promise(r => setTimeout(r, 2000));
 
       const msgOptions = { content: CONFIG.frases[Math.floor(Math.random() * CONFIG.frases.length)] };
       if (CONFIG.fotos?.length > 0) msgOptions.files = CONFIG.fotos;
 
       await canal.send(msgOptions).catch(() => null);
-      log(`Anuncio enviado en #${canal.name}`);
+      log(`ENVIADO EN #${canal.name}`);
       
-      await new Promise(r => setTimeout(r, Math.random() * 20000 + 20000));
+      await new Promise(r => setTimeout(r, 60000));
     }
     
-    const proximaVuelta = Math.floor(Math.random() * 15 + 15) * 60000;
-    setTimeout(() => { if(botActivo) ejecutarBucle(); }, proximaVuelta);
+    setTimeout(() => { if(botActivo) ejecutarBucle(); }, 10000);
 
   } catch (e) { 
-    log(`Error: ${e.message}`);
-    setTimeout(() => { if(botActivo) ejecutarBucle(); }, 5 * 60000); 
+    setTimeout(() => { if(botActivo) ejecutarBucle(); }, 30000); 
   }
 };
 
 login();
+;
 
