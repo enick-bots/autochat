@@ -130,24 +130,16 @@ function iniciarBot(conf) {
       for (const id of canales) {
         if (!botActivo) return;
 
-        if (Math.random() < 0.10) {
-          log(`SE LE OLVIDO HABLAR EN #${id}`);
-          continue;
-        }
-
         let canal = canalesCache.get(id) || await client.channels.fetch(id).catch(() => null);
         if (!canal) continue;
         canalesCache.set(id, canal);
 
         const mensajes = await canal.messages.fetch({ limit: 5 }).catch(() => null);
-        
         const anuncioAmigo = mensajes?.find(m => MIS_BOTS_IDS.includes(m.author.id) && m.author.id !== client.user.id);
+        
         if (anuncioAmigo && Math.random() < 0.12) {
           await new Promise(r => setTimeout(r, 12000));
-          const t = anuncioAmigo.content.toLowerCase();
           let f = "Oye bro ve dm tengo algo q te interese";
-          if (t.includes("paypal")) f = "Oye bro ve dm, tengo algo en paypal que te interesa";
-          else if (t.includes("robux")) f = "Bro revisa dm, tengo robux para eso";
           await anuncioAmigo.reply(f).catch(() => {});
         }
 
@@ -165,25 +157,21 @@ function iniciarBot(conf) {
           } else {
             await canal.send({ content: conf.frases, files: conf.fotos }).catch(() => null);
           }
+          log(`MENSAJE EN #${canal.name}`);
         }
-        await new Promise(r => setTimeout(r, Math.random() * 20000 + 30000));
+        
+    
+        await new Promise(r => setTimeout(r, Math.random() * 20000 + 20000));
       }
 
-      botActivo = false;
-      client.destroy();
-
-      let espera = Math.floor(Math.random() * (10 - 4 + 1) + 4) * 60000;
-      if (Math.random() < 0.02) {
-        espera = Math.floor(Math.random() * (240 - 20 + 1) + 20) * 60000;
-        log(`SUERTE 2% - DESTROY LARGO: ${Math.floor(espera / 60000)} MINUTOS`);
-      } else {
-        log(`REINICIO EN ${Math.floor(espera / 60000)} MINUTOS`);
-      }
-      setTimeout(login, espera);
+    
+      let espera = Math.floor(Math.random() * (480000 - 120000 + 1) + 120000);
+      log(`VUELTA TERMINADA - REINICIO EN ${Math.floor(espera / 60000)} MINUTOS`);
+      
+      setTimeout(ejecutarBucle, espera);
 
     } catch (e) { 
-      if (client) client.destroy();
-      setTimeout(login, 300000); 
+      setTimeout(ejecutarBucle, 300000); 
     }
   };
 
@@ -191,3 +179,4 @@ function iniciarBot(conf) {
 }
 
 botsConfig.forEach(iniciarBot);
+
