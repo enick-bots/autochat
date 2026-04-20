@@ -86,11 +86,11 @@ function iniciarBot(conf, index) {
         return setTimeout(login, 1800000);
     }
     client = new Client({ checkUpdate: false });
-    client.on('ready', () => {
+    client.on('ready', async () => {
       botActivo = true;
       if (!MIS_BOTS_IDS.includes(client.user.id)) MIS_BOTS_IDS.push(client.user.id);
       log(`\x1b[32mON - ${client.user.username}\x1b[0m`);
-      ejecutarBucle();
+      await ejecutarBucle();
     });
 
     client.on('messageCreate', async (message) => {
@@ -100,99 +100,81 @@ function iniciarBot(conf, index) {
 
       if (esReplyAMi) {
         let res = null;
-        let tLabel = "";
         if (esDeMisBots && Math.random() < 0.35) {
             res = conf.frasesMDPositivo[Math.floor(Math.random() * conf.frasesMDPositivo.length)];
-            tLabel = "Helping";
         } else if (!esDeMisBots) {
             const veces = contadorRespuestasUsuario.get(message.author.id) || 0;
             if (veces >= 3 || Math.random() > 0.40) return;
             if (REGEX_VENTA.test(message.content) && conf.respuestasVenta) res = conf.respuestasVenta[Math.floor(Math.random() * conf.respuestasVenta.length)];
             else if (REGEX_MD.test(message.content) && conf.respuestas) res = conf.respuestas[Math.floor(Math.random() * conf.respuestas.length)];
-            if(res) {
-                contadorRespuestasUsuario.set(message.author.id, veces + 1);
-                tLabel = "Usuario";
-            }
+            if(res) contadorRespuestasUsuario.set(message.author.id, veces + 1);
         }
         if (res) {
           const segs = 3 + Math.floor(Math.random() * 4);
-          log(`Respuesta ${tLabel} en ${segs}s a ${message.author.username}`);
-          await new Promise(r => setTimeout(r, segs * 1000));
+          log(`Escribiendo respuesta a ${message.author.username}...`);
           await message.channel.sendTyping().catch(() => {});
+          await new Promise(r => setTimeout(r, segs * 1000));
           await message.reply(res).catch(() => {});
         }
       }
     });
 
-    client.login(conf.token).catch(() => setTimeout(login, 120000));
+    client.login(conf.token).catch((e) => log(`\x1b[31mError Login: ${e.message}\x1b[0m`));
   };
 
   const ejecutarBucle = async () => {
-    if (!botActivo) return;
-
-    const tiempoTranscurrido = Date.now() - INICIO_SCRIPT;
-    if (tiempoTranscurrido > 780000 && tiempoTranscurrido < 800000) {
-        log(`\x1b[31m⚠️ AVISO: 2 min para modo humano\x1b[0m`);
-    }
-
-    if (estaEnHorarioDeSueño()) {
-      log(`\x1b[33mCerrando sesión para dormir\x1b[0m`);
-      botActivo = false;
-      client.destroy();
-      return setTimeout(login, 3600000);
-    }
+    if (!botActivo || !client.user) return;
 
     try {
-      const canales = [...CANALES_IDS].sort(() => Math.random() - 0.5);
+      const canales = [...CANALES_IDS];
+      
       for (const id of canales) {
-        if (!botActivo) return;
+        if (!botActivo) break;
         let canal = canalesCache.get(id) || await client.channels.fetch(id).catch(() => null);
         if (!canal) continue;
         canalesCache.set(id, canal);
 
         const mensajes = await canal.messages.fetch({ limit: 5 }).catch(() => null);
-        const anuncioAmigo = mensajes?.find(m => MIS_BOTS_IDS.includes(m.author.id) && m.author.id !== client.user.id);
         
+        const anuncioAmigo = mensajes?.find(m => MIS_BOTS_IDS.includes(m.author.id) && m.author.id !== client.user.id);
         if (anuncioAmigo && Math.random() < 0.20) {
           const fraseHelp = conf.helpingFrases[Math.floor(Math.random() * conf.helpingFrases.length)];
-          log(`Helping en \x1b[34m#${canal.name}\x1b[0m`);
+          await canal.sendTyping().catch(() => {});
           await new Promise(r => setTimeout(r, 6000));
           await anuncioAmigo.reply(fraseHelp).catch(() => {});
+          log(`Helping en \x1b[34m#${canal.name}\x1b[0m`);
         }
 
         if (mensajes?.first()?.author.id !== client.user.id) {
-          const segs = 2 + Math.floor(Math.random() * 4);
-          await new Promise(r => setTimeout(r, segs * 1000));
+          log(`Escribiendo anuncio en \x1b[34m#${canal.name}\x1b[0m...`);
           await canal.sendTyping().catch(() => {});
-          await canal.send({ content: conf.frases, files: conf.fotos }).catch(() => null);
-          log(`Publicado en \x1b[34m#${canal.name}\x1b[0m`);
+          await new Promise(r => setTimeout(r, 6000));
+          await canal.send({ content: conf.frases, files: conf.fotos }).catch(() => {});
+          log(`\x1b[32mPublicado en #${canal.name}\x1b[0m`);
+        } else {
+            log(`Omitido \x1b[34m#${canal.name}\x1b[0m (Ya soy el último)`);
         }
-        await new Promise(r => setTimeout(r, Math.random() * 15000 + 20000));
+        
+        await new Promise(r => setTimeout(r, 15000 + Math.random() * 10000));
       }
 
       botActivo = false;
       client.destroy();
       
-      let esperaMs;
-      if (Math.random() < 0.01) {
-          esperaMs = (31 + Math.floor(Math.random() * 30)) * 60000;
-          log(`\x1b[41mDescanso Largo: ${Math.floor(esperaMs/60000)}m\x1b[0m`);
-      } else {
-          esperaMs = (2 + Math.floor(Math.random() * 4)) * 60000;
-          log(`Descanso Corto: ${Math.floor(esperaMs/60000)}m`);
-      }
+      const esperaMs = (2 + Math.floor(Math.random() * 4)) * 60000;
+      log(`Ciclo terminado. Reintento en ${Math.floor(esperaMs/60000)}m`);
       setTimeout(login, esperaMs);
 
     } catch (e) { 
+      log(`Error: ${e.message}`);
       if (client) client.destroy();
       setTimeout(login, 60000); 
     }
   };
 
-  const retrasoInicial = index * (Math.floor(Math.random() * 60000) + 180000);
-  log(`Esperando ${Math.floor(retrasoInicial/60000)}m para escalonar inicio`);
+  const retrasoInicial = index * 120000; 
   setTimeout(login, retrasoInicial);
 }
 
-console.log('\x1b[44m SISTEMA DE SELF-BOTS INICIADO \x1b[0m');
+console.log('\x1b[44m SISTEMA ACTIVO \x1b[0m');
 botsConfig.forEach((bot, index) => iniciarBot(bot, index));
