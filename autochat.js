@@ -16,7 +16,8 @@ const botsConfig = [
     fotos: ["./image-3-1.webp"],
     respuestas: ["revisa al dm", "te hable al privado"],
     respuestasVenta: ["acepto ltc y binance"],
-    frasesMDPositivo: ["dale md, hablemos", "va bro, hablemos al priv"]
+    frasesMDPositivo: ["dale md, hablemos"],
+    helpingFrases: ["pasa ltc bro", "revisa el dm"]
   },
   { 
     token: process.env.TOKEN_2, 
@@ -25,7 +26,8 @@ const botsConfig = [
     fotos: ["./img.webp"],
     respuestas: ["checa md", "ya te escribi"],
     respuestasVenta: ["si acepto usd"],
-    frasesMDPositivo: ["mándame mensaje", "dale al dm"]
+    frasesMDPositivo: ["mándame mensaje"],
+    helpingFrases: ["tienes usd?", "checa el priv"]
   },
   { 
     token: process.env.TOKEN_3, 
@@ -34,7 +36,8 @@ const botsConfig = [
     fotos: ["./Screenshot_20260407_214952_Roblox.webp"],
     respuestas: ["mandame soli", "check dm bro"],
     respuestasVenta: ["manejo ltc"],
-    frasesMDPositivo: ["dale, hablemos"]
+    frasesMDPositivo: ["dale, hablemos"],
+    helpingFrases: ["revisa soli", "manda ltc"]
   },
   { 
     token: process.env.TOKEN_4, 
@@ -42,7 +45,9 @@ const botsConfig = [
     frasesError: ["busc robux"], 
     fotos: ["./1b64c693-25ac-4bf6-9d58-f1e8bfced89e-1.webp"],
     respuestas: ["revisa", "ahi te hable"],
-    frasesMDPositivo: ["revisa el dm"]
+    respuestasVenta: ["manda md"],
+    frasesMDPositivo: ["revisa el dm"],
+    helpingFrases: ["tienes stock?", "revisa priv"]
   },
   { 
     token: process.env.TOKEN_5, 
@@ -50,7 +55,9 @@ const botsConfig = [
     frasesError: ["BUSC MONEY"], 
     fotos: ["./Screenshot_20260408_190805_Roblox-1.webp"],
     respuestas: ["al priv", "te mandé md"],
-    frasesMDPositivo: ["hablemos al privado"]
+    respuestasVenta: ["háblame al dm"],
+    frasesMDPositivo: ["hablemos al privado"],
+    helpingFrases: ["ve al dm", "te hable"]
   }
 ];
 
@@ -68,7 +75,7 @@ function iniciarBot(conf) {
   const horasDeSueño = Math.floor(Math.random() * 3) + 7; 
   const horaDespertar = (horaDormir + horasDeSueño) % 24;
 
-  const log = (msg) => console.log(`[${new Date().toLocaleTimeString()}] [${conf.token.substring(0,8)}] ${msg}`);
+  const log = (msg) => console.log(`[${new Date().toLocaleTimeString()}] [${conf.frases.substring(0,10)}...] ${msg}`);
 
   const estaEnHorarioDeSueño = () => {
     const ahora = new Date().getHours();
@@ -76,12 +83,15 @@ function iniciarBot(conf) {
   };
 
   const login = async () => {
-    if (estaEnHorarioDeSueño()) return setTimeout(login, 1800000);
+    if (estaEnHorarioDeSueño()) {
+        log(`Se fue a dormir, despierta a las ${horaDespertar}:00:00`);
+        return setTimeout(login, 1800000);
+    }
     client = new Client({ checkUpdate: false });
     client.on('ready', () => {
       botActivo = true;
       if (!MIS_BOTS_IDS.includes(client.user.id)) MIS_BOTS_IDS.push(client.user.id);
-      log(`ON - Rutina: Duerme ${horaDormir}h / Despierta ${horaDespertar}h`);
+      log(`ON - Usuario: ${client.user.username}`);
       ejecutarBucle();
     });
 
@@ -90,25 +100,33 @@ function iniciarBot(conf) {
       const esReplyAMi = message.referencingMessage?.author.id === client.user.id;
       const esDeMisBots = MIS_BOTS_IDS.includes(message.author.id);
 
-      if (esReplyAMi && esDeMisBots) {
-        if (Math.random() > 0.4) return;
-        await new Promise(r => setTimeout(r, 7000));
-        const res = conf.frasesMDPositivo[Math.floor(Math.random() * conf.frasesMDPositivo.length)];
-        await message.reply(res).catch(() => {});
-        return;
-      }
-
-      if (esReplyAMi && !esDeMisBots) {
-        const veces = contadorRespuestasUsuario.get(message.author.id) || 0;
-        if (veces >= 3 || Math.random() > 0.25) return;
+      if (esReplyAMi) {
         let res = null;
-        if (REGEX_VENTA.test(message.content) && conf.respuestasVenta) res = conf.respuestasVenta[Math.floor(Math.random() * conf.respuestasVenta.length)];
-        else if (REGEX_MD.test(message.content) && conf.respuestas) res = conf.respuestas[Math.floor(Math.random() * conf.respuestas.length)];
+        let tipo = "";
+        
+        if (esDeMisBots && Math.random() < 0.35) {
+            res = conf.frasesMDPositivo[Math.floor(Math.random() * conf.frasesMDPositivo.length)];
+            tipo = "MD Positivo (Amigo)";
+        } else if (!esDeMisBots) {
+            const veces = contadorRespuestasUsuario.get(message.author.id) || 0;
+            if (veces >= 3 || Math.random() > 0.30) return;
+            
+            if (REGEX_VENTA.test(message.content) && conf.respuestasVenta) {
+                res = conf.respuestasVenta[Math.floor(Math.random() * conf.respuestasVenta.length)];
+                tipo = "Venta";
+            } else if (REGEX_MD.test(message.content) && conf.respuestas) {
+                res = conf.respuestas[Math.floor(Math.random() * conf.respuestas.length)];
+                tipo = "MD/Privado";
+            }
+            if(res) contadorRespuestasUsuario.set(message.author.id, veces + 1);
+        }
+
         if (res) {
+          const segs = 4 + Math.floor(Math.random() * 6);
+          log(`${client.user.username} responderá "${res}" (${tipo}) a ${message.author.username} en ${segs}s`);
+          await new Promise(r => setTimeout(r, segs * 1000));
           await message.channel.sendTyping().catch(() => {});
-          await new Promise(r => setTimeout(r, 5000));
           await message.reply(res).catch(() => {});
-          contadorRespuestasUsuario.set(message.author.id, veces + 1);
         }
       }
     });
@@ -119,7 +137,7 @@ function iniciarBot(conf) {
   const ejecutarBucle = async () => {
     if (!botActivo) return;
     if (estaEnHorarioDeSueño()) {
-      log("HORA DE DORMIR - DESTROY");
+      log(`Se fue a dormir, despierta a las ${horaDespertar}:00:00`);
       botActivo = false;
       client.destroy();
       return setTimeout(login, 3600000);
@@ -137,41 +155,53 @@ function iniciarBot(conf) {
         const mensajes = await canal.messages.fetch({ limit: 5 }).catch(() => null);
         const anuncioAmigo = mensajes?.find(m => MIS_BOTS_IDS.includes(m.author.id) && m.author.id !== client.user.id);
         
-        if (anuncioAmigo && Math.random() < 0.12) {
-          await new Promise(r => setTimeout(r, 12000));
-          let f = "Oye bro ve dm tengo algo q te interese";
-          await anuncioAmigo.reply(f).catch(() => {});
+        if (anuncioAmigo && Math.random() < 0.15) {
+          const fraseHelp = conf.helpingFrases[Math.floor(Math.random() * conf.helpingFrases.length)];
+          log(`Ayudando a ${anuncioAmigo.author.username} en #${canal.name} con "${fraseHelp}"`);
+          await new Promise(r => setTimeout(r, 8000 + Math.random() * 5000));
+          await anuncioAmigo.reply(fraseHelp).catch(() => {});
         }
 
         if (mensajes?.first()?.author.id !== client.user.id) {
+          const segs = 3 + Math.floor(Math.random() * 7);
+          log(`${client.user.username} escribirá en #${canal.name} en ${segs}s`);
+          await new Promise(r => setTimeout(r, segs * 1000));
           await canal.sendTyping().catch(() => {});
-          await new Promise(r => setTimeout(r, 6000));
 
-          if (Math.random() < 0.15 && conf.frasesError) {
+          if (Math.random() < 0.12 && conf.frasesError) {
             const msgErr = conf.frasesError[Math.floor(Math.random() * conf.frasesError.length)];
             const enviado = await canal.send({ content: msgErr, files: conf.fotos }).catch(() => null);
             if (enviado) {
-              await new Promise(r => setTimeout(r, 5000));
+              await new Promise(r => setTimeout(r, 4000));
               await enviado.edit(conf.frases).catch(() => {});
             }
           } else {
             await canal.send({ content: conf.frases, files: conf.fotos }).catch(() => null);
           }
-          log(`MENSAJE EN #${canal.name}`);
         }
-        
-    
-        await new Promise(r => setTimeout(r, Math.random() * 20000 + 20000));
+        await new Promise(r => setTimeout(r, Math.random() * 15000 + 25000));
       }
 
-    
-      let espera = Math.floor(Math.random() * (480000 - 120000 + 1) + 120000);
-      log(`VUELTA TERMINADA - REINICIO EN ${Math.floor(espera / 60000)} MINUTOS`);
+      botActivo = false;
+      client.destroy();
       
-      setTimeout(ejecutarBucle, espera);
+      let esperaMs;
+      let tipoD;
+      
+      if (Math.random() < 0.05) {
+          esperaMs = (31 + Math.floor(Math.random() * 89)) * 60000;
+          tipoD = "Largo";
+      } else {
+          esperaMs = (4 + Math.floor(Math.random() * 26)) * 60000;
+          tipoD = "Corto";
+      }
+
+      log(`Acaba de desconectarse (${tipoD}), vuelve en ${Math.floor(esperaMs/60000)} minutos`);
+      setTimeout(login, esperaMs);
 
     } catch (e) { 
-      setTimeout(ejecutarBucle, 300000); 
+      if (client) client.destroy();
+      setTimeout(login, 300000); 
     }
   };
 
@@ -179,4 +209,3 @@ function iniciarBot(conf) {
 }
 
 botsConfig.forEach(iniciarBot);
-
